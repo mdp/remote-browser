@@ -8,6 +8,7 @@ workspace.
 ## What runs
 
 - `kasmweb/chrome:1.19.0` provides Chrome and KasmVNC.
+- The desktop is fixed at 1920×1080; KasmVNC client resize requests are disabled.
 - Chrome's user data directory is persisted at `${BROWSER_DATA_DIR}/profile`.
 - KasmVNC is reachable on localhost and the configured Tailscale IP.
 - CDP is forwarded to `http://127.0.0.1:9222` by default. CDP has no
@@ -46,6 +47,10 @@ The profile, Chrome settings, downloads, and KasmVNC files live below that path.
 They survive container recreation and image updates. Stop the browser before
 backing up or copying its profile. Do not run two Chrome instances against the
 same profile. Deleting this directory deletes the saved browser state.
+
+The fixed desktop size and resize policy are in `kasmvnc.yaml`. To use another
+fixed size, change `desktop.resolution.width` and `height`, leave
+`desktop.allow_resize` set to `false`, and recreate the container.
 
 To retain an existing Kasm Chrome profile, copy its user-data directory into
 `${BROWSER_DATA_DIR}/profile` while Chrome is stopped. Site cookies and other

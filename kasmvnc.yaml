@@ -1,0 +1,13 @@
+desktop:
+  resolution:
+    width: 1920
+    height: 1080
+  allow_resize: false
+
+runtime_configuration:
+  allow_client_to_override_kasm_server_settings: false
+
+logging:
+  log_writer_name: all
+  log_dest: logfile
+  level: 30

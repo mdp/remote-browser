@@ -9,6 +9,7 @@ services:
     shm_size: "2gb"
     environment:
       VNC_PW: ${VNC_PASSWORD:?Set VNC_PASSWORD in browser/.env}
+      VNC_RESOLUTION: "1920x1080"
       APP_ARGS: >-
         --user-data-dir=/tmp/chrome-debug
         --remote-debugging-port=9222
@@ -20,6 +21,7 @@ services:
       - "${BROWSER_DATA_DIR:-./data}/profile:/tmp/chrome-debug:rw"
       - "${BROWSER_DATA_DIR:-./data}/Downloads:/home/kasm-user/Downloads:rw"
       - "${BROWSER_DATA_DIR:-./data}/vnc:/home/kasm-user/.vnc:rw"
+      - ./kasmvnc.yaml:/home/kasm-user/.vnc/kasmvnc.yaml:ro
     ports:
       # KasmVNC serves HTTPS on 6901. Bind only localhost and the tailnet IP.
       - "127.0.0.1:${KASM_PORT:-6901}:6901"
