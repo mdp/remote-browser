@@ -1,0 +1,18 @@
+# Local environment and secrets
+.env
+
+# Browser state (prefer BROWSER_DATA_DIR outside this repository)
+/data/
+/state/
+/profile/
+/Downloads/
+/config/
+/vnc/
+
+# Local runtime artifacts
+*.log
+*.pem
+*.key
+*.crt
+*.sync-conflict-*
+.DS_Store
