@@ -5,6 +5,7 @@ services:
     # Keep the original profile hostname: Chrome stores it in SingletonLock.
     hostname: hermes-chrome
     restart: unless-stopped
+    stop_grace_period: 30s
     shm_size: "2gb"
     environment:
       VNC_PW: ${VNC_PASSWORD:?Set VNC_PASSWORD in browser/.env}
@@ -20,12 +21,9 @@ services:
       - "${BROWSER_DATA_DIR:-./data}/Downloads:/home/kasm-user/Downloads:rw"
       - "${BROWSER_DATA_DIR:-./data}/vnc:/home/kasm-user/.vnc:rw"
     ports:
-      # KasmVNC web UI: localhost and tailnet only. Tailscale encrypts HTTP
-      # traffic; port 6902 is also available for KasmVNC's HTTPS endpoint.
-      - "127.0.0.1:${KASM_HTTP_PORT:-6901}:6901"
-      - "${TAILSCALE_IP:?Set TAILSCALE_IP in browser/.env}:${KASM_HTTP_PORT:-6901}:6901"
-      - "127.0.0.1:${KASM_HTTPS_PORT:-6902}:6902"
-      - "${TAILSCALE_IP:?Set TAILSCALE_IP in browser/.env}:${KASM_HTTPS_PORT:-6902}:6902"
+      # KasmVNC serves HTTPS on 6901. Bind only localhost and the tailnet IP.
+      - "127.0.0.1:${KASM_PORT:-6901}:6901"
+      - "${TAILSCALE_IP:?Set TAILSCALE_IP in browser/.env}:${KASM_PORT:-6901}:6901"
       # The CDP forwarder below listens on 9223 inside this shared network
       # namespace. Never publish this unauthenticated endpoint beyond loopback.
       - "127.0.0.1:${CDP_HOST_PORT:-9222}:9223"

@@ -23,10 +23,11 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Open `http://localhost:6901` locally, or `https://<TAILSCALE_IP>:6902` from a
-device on the tailnet. KasmVNC asks for `VNC_PASSWORD`. Its HTTPS certificate is
-self-signed unless you configure your own certificate; the tailnet connection
-is encrypted by Tailscale regardless.
+Open `https://localhost:6901` locally, or `https://<TAILSCALE_IP>:6901` from a
+device on the tailnet. At the browser's authentication prompt, use username
+`kasm_user` and the password in your local `.env` (`VNC_PASSWORD`). Its HTTPS
+certificate is self-signed unless you configure your own certificate; the
+tailnet connection is also encrypted by Tailscale.
 
 The Chrome CDP endpoint is `http://localhost:9222`. For example, local browser
 automation can connect to that endpoint. Do not bind CDP to a network interface:
@@ -55,8 +56,7 @@ reauthentication. Chrome Sync and website login sessions are separate features.
 
 | Host port | Service | Binding |
 | --- | --- | --- |
-| `6901` | KasmVNC web UI (HTTP) | localhost + configured Tailscale IP |
-| `6902` | KasmVNC web UI (HTTPS) | localhost + configured Tailscale IP |
+| `6901` | KasmVNC web UI (HTTPS; Basic Auth) | localhost + configured Tailscale IP |
 | `9222` | Chrome CDP | localhost only |
 
 Override the host ports in `.env` if they are already in use. Do not publish
