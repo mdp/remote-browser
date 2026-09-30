@@ -1,76 +1,98 @@
 # Persistent KasmVNC Chrome
 
-A single persistent Google Chrome desktop using KasmVNC, with a localhost-only
-Chrome DevTools Protocol (CDP) endpoint for local automation. This directory is
-designed to become a standalone repository and, later, a submodule of its parent
-workspace.
+**A browser that stays signed in—available from your desktop or tailnet, with a
+local-only automation port.** This project runs one persistent Chrome profile
+inside KasmVNC and exposes Chrome DevTools Protocol (CDP) on loopback for local
+automation.
 
-## What runs
+> **Treat this like an unlocked computer.** The desktop can access signed-in
+> sessions, and CDP can fully control Chrome. Use a strong VNC password, and
+> never expose port `9222` to your network.
 
-- `kasmweb/chrome:1.19.0` provides Chrome and KasmVNC.
-- The desktop is fixed at 1920×1080; KasmVNC client resize requests are disabled.
-- Chrome's user data directory is persisted at `${BROWSER_DATA_DIR}/profile`.
-- KasmVNC is reachable on localhost and the configured Tailscale IP.
-- CDP is forwarded to `http://127.0.0.1:9222` by default. CDP has no
-  authentication and can control the entire browser, so it is deliberately not
-  exposed on Tailscale or other network interfaces.
+## Quick start
 
-## Configure and start
+Requirements: Docker Engine with the Compose plugin, and a Tailscale IPv4
+address for access from other tailnet devices.
 
 ```sh
+cd browser
 cp .env.example .env
-# Edit .env: set TAILSCALE_IP, choose a strong VNC_PASSWORD, and set
-# BROWSER_DATA_DIR to a private path outside Syncthing (recommended).
+```
+
+Edit `.env`: set `TAILSCALE_IP` to the host's Tailscale IPv4 address (get it
+with `tailscale ip -4`), choose a strong `VNC_PASSWORD`, and point
+`BROWSER_DATA_DIR` somewhere private and outside Syncthing. Then start it:
+
+```sh
 docker compose up -d
 ```
 
-Open `https://localhost:6901` locally, or `https://<TAILSCALE_IP>:6901` from a
-device on the tailnet. At the browser's authentication prompt, use username
-`kasm_user` and the password in your local `.env` (`VNC_PASSWORD`). Its HTTPS
-certificate is self-signed unless you configure your own certificate; the
-tailnet connection is also encrypted by Tailscale.
+Open **https://localhost:6901** on the host or **https://<TAILSCALE_IP>:6901**
+from a device on your tailnet. Sign in as `kasm_user` with the password from
+`.env`. The browser presents a self-signed HTTPS certificate by default, so
+your browser will show a certificate warning; Tailscale encrypts tailnet
+traffic.
 
-The Chrome CDP endpoint is `http://localhost:9222`. For example, local browser
-automation can connect to that endpoint. Do not bind CDP to a network interface:
-it has no authentication and grants full browser control, including access to
-signed-in sessions.
+Chrome automation tools can connect locally to **http://127.0.0.1:9222**.
 
-## Persistent browser state
+## What’s running
 
-Use a private `BROWSER_DATA_DIR`, ideally outside any synced folder, for example:
+| Container | Role |
+| --- | --- |
+| `browser-chrome` | Chrome desktop and KasmVNC web interface |
+| `browser-cdp-forward` | Loopback-friendly CDP proxy; rewrites the `Host` header Chrome expects |
+
+The desktop is fixed at **1920 × 1080**. Chrome’s profile and settings are
+persisted on the host, so they survive container restarts and image updates.
+The Compose file pins the image to `kasmweb/chrome:1.19.0`.
+
+### Ports and reachability
+
+| Host port | Service | Reachable from |
+| --- | --- | --- |
+| `6901` | KasmVNC desktop (HTTPS, password-protected) | Host and configured Tailscale IP |
+| `9222` | Chrome CDP (unauthenticated, full browser control) | Host only (`127.0.0.1`) |
+
+Both host ports can be changed in `.env` with `KASM_PORT` and
+`CDP_HOST_PORT`. **Keep CDP loopback-only**: anyone who can reach it can control
+the browser and its signed-in sessions.
+
+## Your browser profile
+
+By default, browser data goes under `browser/data`. For a private, unsynced
+location, set an absolute path in `.env`, for example:
 
 ```dotenv
 BROWSER_DATA_DIR=/home/your-user/.local/share/kasm-browser
 ```
 
-The profile, Chrome settings, downloads, and KasmVNC files live below that path.
-They survive container recreation and image updates. Stop the browser before
-backing up or copying its profile. Do not run two Chrome instances against the
-same profile. Deleting this directory deletes the saved browser state.
+The directory holds Chrome’s profile, configuration, downloads, and VNC
+settings. Back it up only while Chrome is stopped, and never run two Chrome
+instances against the same profile. Deleting the directory deletes the saved
+browser state. To move an existing profile, stop Chrome and copy its
+user-data directory into `<BROWSER_DATA_DIR>/profile`; sites may still ask you
+to sign in again.
 
-The fixed desktop size and resize policy are in `kasmvnc.yaml`. To use another
-fixed size, change `desktop.resolution.width` and `height`, leave
-`desktop.allow_resize` set to `false`, and recreate the container.
+The fixed screen size and resize behavior are configured in `kasmvnc.yaml`.
+To change the size, update `desktop.resolution.width` and `height`, keep
+`desktop.allow_resize: false`, then recreate the container.
 
-To retain an existing Kasm Chrome profile, copy its user-data directory into
-`${BROWSER_DATA_DIR}/profile` while Chrome is stopped. Site cookies and other
-local profile data generally persist; individual websites may still require
-reauthentication. Chrome Sync and website login sessions are separate features.
+## Day-to-day
 
-## Ports
+Run these commands from `browser/`:
 
-| Host port | Service | Binding |
-| --- | --- | --- |
-| `6901` | KasmVNC web UI (HTTPS; Basic Auth) | localhost + configured Tailscale IP |
-| `9222` | Chrome CDP | localhost only |
+```sh
+docker compose logs -f          # follow startup and runtime logs
+docker compose restart          # restart without deleting browser data
+docker compose down             # stop and remove containers
+docker compose up -d            # start again
+```
 
-Override the host ports in `.env` if they are already in use. Do not publish
-CDP beyond localhost unless you add a separately secured access layer.
+## Keep it safe
 
-## Repository hygiene
-
-`.env` and browser state are ignored by Git. Commit only source/configuration and
-the placeholder `.env.example`; never commit profiles, credentials, downloads,
-certificates, or machine-specific addresses. The parent workspace temporarily
-ignores this directory while it is prepared as an independent repository. Once
-the public remote exists, register it as a Git submodule.
+- `.env` contains the desktop password and machine-specific address; keep it
+  private. It is ignored by Git.
+- Keep `BROWSER_DATA_DIR` private and out of synced folders and public repos.
+- Never publish CDP (`9222`) on a LAN, tailnet, or public interface.
+- Don’t commit browser profiles, credentials, downloads, certificates, or
+  machine-specific configuration. `.env.example` is the shareable template.
