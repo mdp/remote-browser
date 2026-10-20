@@ -1,0 +1,15 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+data
+state
+artifacts
+backups
+node_modules
+*.test.ts
+scripts
+README.md
+SECURITY.md
+LICENSE

@@ -1,0 +1,98 @@
+name: browser
+
+services:
+  chrome:
+    image: kasmweb/chrome:1.19.0
+    # Keep this stable: Chrome's profile directory records the hostname in SingletonLock.
+    hostname: ${CHROME_HOSTNAME:-chrome-profile}
+    restart: unless-stopped
+    stop_grace_period: 30s
+    shm_size: "2gb"
+    environment:
+      VNC_PW: ${VNC_PASSWORD:?Set VNC_PASSWORD}
+      VNC_RESOLUTION: "1920x1080"
+      APP_ARGS: >-
+        --user-data-dir=/tmp/chrome-debug
+        --remote-debugging-port=9222
+        --remote-allow-origins=*
+        --start-maximized
+        --restore-last-session
+      LAUNCH_URL: about:blank
+    volumes:
+      - "${BROWSER_DATA_DIR:?Set BROWSER_DATA_DIR}/config:/home/kasm-user/.config:rw"
+      - "${BROWSER_DATA_DIR}/profile:/tmp/chrome-debug:rw"
+      - "${BROWSER_DATA_DIR}/Downloads:/home/kasm-user/Downloads:rw"
+      - "${BROWSER_DATA_DIR}/vnc:/home/kasm-user/.vnc:rw"
+      - ./kasmvnc.yaml:/home/kasm-user/.vnc/kasmvnc.yaml:ro
+    ports:
+      - "${BROWSER_BIND_IP:-127.0.0.1}:${KASM_PORT:-6901}:6901"
+    # CDP is available only to this Docker network, never published on the host.
+    expose:
+      - "9223"
+    healthcheck:
+      test: [CMD, curl, -fsS, http://127.0.0.1:9222/json/version]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 90s
+
+  cdp-forward:
+    image: oven/bun:1.4.0
+    restart: unless-stopped
+    # Shares Chrome's network namespace so it can reach CDP on Chrome's loopback.
+    network_mode: service:chrome
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: [bun, /app/cdp-forward.ts]
+    environment:
+      CDP_LISTEN_PORT: "9223"
+      CDP_TARGET_HOST: "127.0.0.1"
+      CDP_TARGET_PORT: "9222"
+    volumes:
+      - ./cdp-forward.ts:/app/cdp-forward.ts:ro
+    depends_on:
+      chrome:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, bun, -e, 'const r=await fetch("http://127.0.0.1:9223/json/version"); if(!r.ok)process.exit(1);']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  mcp:
+    build:
+      context: .
+      args:
+        AGENT_BROWSER_VERSION: 0.39.1
+        SUPERGATEWAY_VERSION: 4.2.0
+    restart: unless-stopped
+    # Publish only authenticated MCP. CDP uses Docker DNS on the private bridge.
+    ports:
+      - "${BROWSER_BIND_IP:-127.0.0.1}:${BROWSER_MCP_PORT:-8931}:8931"
+    depends_on:
+      cdp-forward:
+        condition: service_healthy
+    user: "${LOCAL_UID:-1000}:${LOCAL_GID:-1000}"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      HOME: /home/node
+      SUPERGATEWAY_API_KEY: ${BROWSER_MCP_API_KEY:?Set a random BROWSER_MCP_API_KEY}
+      AGENT_BROWSER_CDP: ${BROWSER_CDP_URL:-http://chrome:9223}
+      AGENT_BROWSER_SESSION: ${BROWSER_AGENT_SESSION:-browser}
+      AGENT_BROWSER_NAMESPACE: ${BROWSER_AGENT_NAMESPACE:-browser-agent}
+      AGENT_BROWSER_PIN_TAB: "1"
+      AGENT_BROWSER_CONTENT_BOUNDARIES: "1"
+      AGENT_BROWSER_MAX_OUTPUT: "50000"
+      AGENT_BROWSER_NO_AUTO_DIALOG: "1"
+    volumes:
+      - "${BROWSER_AGENT_DATA_DIR:?Set BROWSER_AGENT_DATA_DIR}:/home/node/.agent-browser"
+    healthcheck:
+      test: [CMD, curl, -fsS, http://127.0.0.1:8931/healthz]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

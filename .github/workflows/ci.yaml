@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Run tests
+        run: bun test
+      - name: Validate Compose file
+        env:
+          BROWSER_BIND_IP: 127.0.0.1
+          VNC_PASSWORD: ci-only
+          BROWSER_MCP_API_KEY: ci-only
+          BROWSER_DATA_DIR: /tmp/kasm-browser
+          BROWSER_AGENT_DATA_DIR: /tmp/browser-agent
+        run: docker compose config --quiet

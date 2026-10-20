@@ -1,18 +1,22 @@
 # Local environment and secrets
 .env
+.env.*
+!.env.example
 
 # Browser state (prefer BROWSER_DATA_DIR outside this repository)
 /data/
 /state/
+/artifacts/
 /profile/
 /Downloads/
 /config/
 /vnc/
+/backups/
 
-# Local runtime artifacts
-*.log
+node_modules/
 *.pem
 *.key
 *.crt
+*.log
 *.sync-conflict-*
 .DS_Store
