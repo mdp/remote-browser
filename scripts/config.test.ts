@@ -34,7 +34,7 @@ test('requires a secret and attaches to the VNC Chrome without profile sharing',
 
 test('one stack owns VNC, private CDP, and MCP; profile stays outside source', () => {
   expect(compose.name).toBe('browser');
-  expect(Object.keys(compose.services).sort()).toEqual(['cdp-forward', 'chrome', 'mcp']);
+  expect(Object.keys(compose.services).sort()).toEqual(['cdp-forward', 'chrome', 'cloudflared', 'mcp']);
   const chrome = compose.services.chrome;
   expect(chrome.hostname).toBe('${CHROME_HOSTNAME:-chrome-profile}');
   expect(chrome.environment.APP_ARGS).toContain('--restore-last-session');
@@ -43,6 +43,18 @@ test('one stack owns VNC, private CDP, and MCP; profile stays outside source', (
   expect(chrome.volumes.join()).toContain('${BROWSER_DATA_DIR}/profile:/tmp/chrome-debug:rw');
   expect(compose.services['cdp-forward'].network_mode).toBe('service:chrome');
   expect(compose.services.mcp.depends_on['cdp-forward'].condition).toBe('service_healthy');
+});
+
+test('cloudflared is an opt-in tunnel profile with a required token', () => {
+  const cloudflared = compose.services.cloudflared;
+  expect(cloudflared.profiles).toEqual(['tunnel']);
+  expect(cloudflared.command).toContain('tunnel');
+  expect(cloudflared.environment.TUNNEL_TOKEN).toContain('CLOUDFLARE_TUNNEL_TOKEN:?');
+  expect(cloudflared.depends_on.mcp.condition).toBe('service_healthy');
+  const rendered = JSON.stringify(cloudflared);
+  for (const port of ['9222', '9223']) {
+    expect(rendered).not.toContain(`:${port}:`);
+  }
 });
 
 test('never publishes raw CDP', () => {

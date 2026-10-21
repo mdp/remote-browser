@@ -37,21 +37,34 @@ chmod 600 .env
 
 Edit `.env`:
 
-1. Set `BROWSER_BIND_IP` to `127.0.0.1` for local-only access, or to a
-   Tailscale/LAN address if you need remote access.
+1. Set `BROWSER_BIND_IP` to the address the VNC and MCP ports listen on:
+   - `127.0.0.1` — local only (default)
+   - your Tailscale IP (`tailscale ip -4`) — tailnet-only access (recommended
+     for remote access)
+   - `0.0.0.0` — every interface; only behind a firewall/TLS proxy
 2. Set `BROWSER_DATA_DIR` and `BROWSER_AGENT_DATA_DIR` to persistent paths
    outside this repository.
 3. Set `VNC_PASSWORD` to a strong password.
 4. Generate `BROWSER_MCP_API_KEY` with `openssl rand -hex 32`.
-5. Set `LOCAL_UID` / `LOCAL_GID` to the owner of the data directories.
+5. Set `LOCAL_UID` / `LOCAL_GID` to the owner of the data directories
+   (`id -u` / `id -g`).
 
-Create the directories, then start the stack:
+Create the data directories **as your own user before starting Docker**, then
+start the stack:
 
 ```sh
-mkdir -p /path/to/kasm-browser/{config,profile,Downloads,vnc} /path/to/browser-agent
+BROWSER_DATA_DIR=/home/you/.local/share/kasm-browser
+BROWSER_AGENT_DATA_DIR=/home/you/.local/share/browser-agent
+mkdir -p "$BROWSER_DATA_DIR"/{config,profile,Downloads,vnc} "$BROWSER_AGENT_DATA_DIR"
 bun run up            # or: docker compose up -d --build --wait
 bun run ps
 ```
+
+> **Why the manual `mkdir` matters:** Compose bind-mounts auto-create missing
+> host directories as root. The container runs as uid 1000 (`kasm_user`) and
+> startup then fails with `Permission denied` writing its profile. If Docker
+> already created them, fix with
+> `sudo chown -R $LOCAL_UID:$LOCAL_GID <data dirs>`.
 
 The first start builds the MCP image and waits for all health checks. Chrome's
 first launch may take up to a minute.
@@ -92,6 +105,8 @@ All settings are environment variables read from `.env` or the shell. See
 | `CHROME_HOSTNAME` | `chrome-profile` | Chrome container hostname; keep stable |
 | `BROWSER_AGENT_SESSION` | `browser` | agent-browser session name |
 | `BROWSER_AGENT_NAMESPACE` | `browser-agent` | agent-browser metadata namespace |
+| `CLOUDFLARE_TUNNEL_TOKEN` | — | Remotely managed tunnel connector token (`tunnel` profile) |
+| `BROWSER_TUNNEL_HOSTNAME` | — | Informational only: the public hostname configured in the Cloudflare dashboard |
 
 `BROWSER_BIND_IP=0.0.0.0` publishes the ports on every interface. Only do that
 behind a firewall or a TLS-terminating proxy.
@@ -114,6 +129,16 @@ docker compose up -d --build --no-deps mcp   # update only the MCP adapter
   use `agent_browser_tab_new` to bind a fresh automation tab, or
   `agent_browser_tab_list` and `agent_browser_tab_switch` to select a restored
   one. Do not disable pinning or adopt a random human tab.
+
+### Troubleshooting
+
+- **`Permission denied` during Chrome startup** (`cp: cannot create directory
+  ... /home/kasm-user/...`): the data directories are root-owned because Docker
+  created them. Run `sudo chown -R $LOCAL_UID:$LOCAL_GID <BROWSER_DATA_DIR>
+  <BROWSER_AGENT_DATA_DIR>` and restart.
+- **Bind errors at startup with a Tailscale bind**: `BROWSER_BIND_IP` must be
+  an address that exists on the host when Docker starts. If the node's
+  Tailscale IP changed, update it (`tailscale ip -4`) and restart.
 
 ## Tool surface
 
@@ -144,20 +169,41 @@ as untrusted data rather than instructions.
 - To report a vulnerability, use the repository's GitHub Security Advisories
   rather than a public issue.
 
-## Open WebUI (optional)
+## Cloudflare Tunnel (optional)
 
-`scripts/connect-openwebui.ts` registers this MCP endpoint as an admin-only tool
-connection. Set `OPENWEBUI_URL`, `OPENWEBUI_API_KEY`, and the browser variables
-in `.env`, then preview and apply:
+The `cloudflared` service connects a remotely managed Cloudflare Tunnel to this
+Compose network, making the MCP endpoint reachable at a public HTTPS hostname.
+The connector is opt-in through the `tunnel` Compose profile; ordinary startup
+stays private. No extra host ports are exposed.
+
+In `.env` set `CLOUDFLARE_TUNNEL_TOKEN` — the remotely managed tunnel's
+connector token from the Cloudflare dashboard (Zero Trust → Networks →
+Tunnels), not an API key. Optionally record the public hostname in
+`BROWSER_TUNNEL_HOSTNAME` for reference; cloudflared does not read it.
+
+Then in Cloudflare's tunnel dashboard, add the public application route:
+
+- Hostname: `tunnel.foo.com` (configure in the dashboard)
+- Service type: **HTTP**
+- Service URL: **`mcp:8931`** (path `/mcp`)
+
+Use the Docker service name, not `localhost` or a host address. The tunnel is
+public; access is protected only by the `BROWSER_MCP_API_KEY` Bearer key, so
+keep that key strong. Do not publish a route for Chrome/VNC or CDP.
+
+Start or inspect just the connector:
 
 ```sh
-bun run connect
-bun run connect --apply
+docker compose --profile tunnel up -d --no-deps cloudflared
+docker compose logs --tail=50 cloudflared   # expect "Registered tunnel connection"
 ```
 
-The script verifies tool discovery first, refuses to overwrite a connection that
-points elsewhere, and writes a timestamped backup of the existing tool-server
-configuration to `backups/` (gitignored, contains credentials) before saving.
+Verify, then point clients at `https://<tunnel hostname>/mcp` with the same
+Bearer key:
+
+```sh
+curl -i https://<tunnel hostname>/healthz   # 401 without the key, 200 with it
+```
 
 ## Development
 
@@ -175,12 +221,12 @@ forms or clear state.
 Layout:
 
 ```
-compose.yaml          three-service stack
+compose.yaml          four-service stack (cloudflared is opt-in via profile)
 Dockerfile            MCP adapter image
 supergateway.json     MCP server and tool allowlist
 cdp-forward.ts        Host-header-rewriting TCP/WebSocket proxy
 kasmvnc.yaml          KasmVNC desktop settings
-scripts/              tests, smoke test, Open WebUI helper
+scripts/              tests and smoke test
 ```
 
 ## License

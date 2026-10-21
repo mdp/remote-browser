@@ -96,3 +96,16 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  # Opt-in public endpoint. Requires CLOUDFLARE_TUNNEL_TOKEN in .env and a
+  # remotely managed tunnel route pointing at the MCP service.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.9.1
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --protocol http2 run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?Set CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      mcp:
+        condition: service_healthy

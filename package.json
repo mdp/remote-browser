@@ -12,7 +12,6 @@
     "logs": "docker compose logs --tail=50",
     "config": "docker compose config",
     "test": "bun test",
-    "smoke": "bun scripts/smoke-test.ts",
-    "connect": "bun scripts/connect-openwebui.ts"
+    "smoke": "bun scripts/smoke-test.ts"
   }
 }

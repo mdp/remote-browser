@@ -25,4 +25,4 @@ session:
   container escape by itself.
 
 Reports about the upstream projects (Chrome, KasmVNC, agent-browser,
-Supergateway, Open WebUI) should be sent to their respective maintainers.
+Supergateway) should be sent to their respective maintainers.
