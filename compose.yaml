@@ -2,7 +2,11 @@ name: browser
 
 services:
   chrome:
-    image: kasmweb/chrome:1.19.0
+    build:
+      context: .
+      dockerfile: Dockerfile.chrome
+      args:
+        CHROME_BASE_IMAGE: kasmweb/chrome:1.19.0
     # Keep this stable: Chrome's profile directory records the hostname in SingletonLock.
     hostname: ${CHROME_HOSTNAME:-chrome-profile}
     restart: unless-stopped

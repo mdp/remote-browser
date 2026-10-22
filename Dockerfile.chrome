@@ -1,0 +1,16 @@
+ARG CHROME_BASE_IMAGE=kasmweb/chrome:1.19.0
+FROM ${CHROME_BASE_IMAGE}
+
+# KasmVNC's browser client defaults to "Remote Resizing" when it is not embedded
+# in Kasm Workspaces. Force "Local Scaling" and disable the selector so the
+# 1920x1080 desktop is always scaled in the browser instead of resizing the
+# server. The patch targets the pinned base image; the build fails loudly if
+# the expected bundle changes.
+USER root
+RUN set -eux; \
+    ui="$(find /usr/share/kasmvnc/www/assets -maxdepth 1 -type f -name 'ui-*.js' -print -quit)"; \
+    test -n "$ui"; \
+    grep -q 'initSetting("resize","remote")' "$ui"; \
+    sed -i 's/initSetting("resize","remote")/forceSetting("resize","scale")/g' "$ui"; \
+    grep -q 'forceSetting("resize","scale")' "$ui"
+USER 1000

@@ -116,6 +116,12 @@ Three services on a private Docker network:
 | `cdp-forward` | Bun proxy that fixes Chrome's Host-header check |
 | `mcp` | agent-browser native MCP behind Supergateway, Bearer auth only |
 
+`chrome` is built from `Dockerfile.chrome` on top of the pinned
+`kasmweb/chrome:1.19.0` base. The local image locks KasmVNC's client to
+**Local Scaling** (remote resizing is also disabled server-side) and names the
+desktop `remote-browser`, so the browser tab reads
+`remote-browser - KasmVNC`.
+
 Raw CDP is unauthenticated and never leaves the private network: no host port
 for it, ever. `mcp` runs unprivileged with all capabilities dropped and no
 access to the Chrome profile or a Docker socket.
@@ -176,6 +182,7 @@ Do not publish a route for Chrome/VNC or CDP.
 docker compose ps                                 # container status
 docker compose logs --tail=50 chrome              # recent logs
 docker compose up -d --build --no-deps mcp        # update only the MCP adapter
+docker compose build chrome                      # after changing the Chrome base
 ```
 
 - `cdp-forward` shares Chrome's network namespace. If you recreate `chrome`,
