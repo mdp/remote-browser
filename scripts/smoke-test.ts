@@ -6,7 +6,7 @@ const key = process.env.BROWSER_MCP_API_KEY;
 if (!key) throw new Error('Set BROWSER_MCP_API_KEY');
 
 const bindIp = process.env.BROWSER_BIND_IP || '127.0.0.1';
-const reachableHost = bindIp === '0.0.0.0' || bindIp === '::' ? '127.0.0.1' : bindIp;
+const reachableHost = bindIp === '0.0.0.0' ? '127.0.0.1' : bindIp;
 const configured = (
   process.env.BROWSER_MCP_URL ||
   `http://${reachableHost}:${process.env.BROWSER_MCP_PORT || '8931'}/mcp`
