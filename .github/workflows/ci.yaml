@@ -21,4 +21,5 @@ jobs:
           BROWSER_MCP_API_KEY: ci-only
           BROWSER_DATA_DIR: /tmp/kasm-browser
           BROWSER_AGENT_DATA_DIR: /tmp/browser-agent
+          CLOUDFLARE_TUNNEL_TOKEN: ci-only
         run: docker compose config --quiet
